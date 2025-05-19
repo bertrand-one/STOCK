@@ -1,23 +1,29 @@
 import { useState, useEffect } from 'react';
 import axios from 'axios';
-import { Plus, Edit, Trash2, Search, X } from 'lucide-react';
+import { Plus, Edit, Trash2, Search, X, AlertCircle } from 'lucide-react';
+import { validateName } from '../utils/validation';
+import FormValidationError from '../components/FormValidationError';
 
 const Products = () => {
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
-  
+
   const [showAddModal, setShowAddModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
-  
+
   const [newProduct, setNewProduct] = useState({ pname: '', quantity: 0 });
   const [editProduct, setEditProduct] = useState({ id: null, pname: '' });
   const [deleteProductId, setDeleteProductId] = useState(null);
-  
+
   const [formError, setFormError] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
+  const [validationErrors, setValidationErrors] = useState({
+    newProductName: '',
+    editProductName: ''
+  });
 
   // Fetch products
   const fetchProducts = async () => {
@@ -43,22 +49,26 @@ const Products = () => {
   // Handle add product
   const handleAddProduct = async (e) => {
     e.preventDefault();
-    
-    if (!newProduct.pname.trim()) {
-      setFormError('Product name is required');
+    setFormError('');
+
+    // Validate product name
+    const nameValidation = validateName(newProduct.pname, 'Product name');
+    if (!nameValidation.isValid) {
+      setValidationErrors({...validationErrors, newProductName: nameValidation.message});
+      setFormError('Please fix the errors in the form');
       return;
     }
-    
+
     try {
       await axios.post('http://localhost:5000/api/products', newProduct, {
         withCredentials: true
       });
-      
+
       setSuccessMessage('Product added successfully');
       setNewProduct({ pname: '', quantity: 0 });
       setShowAddModal(false);
       fetchProducts();
-      
+
       // Clear success message after 3 seconds
       setTimeout(() => {
         setSuccessMessage('');
@@ -72,23 +82,27 @@ const Products = () => {
   // Handle edit product
   const handleEditProduct = async (e) => {
     e.preventDefault();
-    
-    if (!editProduct.pname.trim()) {
-      setFormError('Product name is required');
+    setFormError('');
+
+    // Validate product name
+    const nameValidation = validateName(editProduct.pname, 'Product name');
+    if (!nameValidation.isValid) {
+      setValidationErrors({...validationErrors, editProductName: nameValidation.message});
+      setFormError('Please fix the errors in the form');
       return;
     }
-    
+
     try {
       await axios.put(`http://localhost:5000/api/products/${editProduct.id}`, {
         pname: editProduct.pname
       }, {
         withCredentials: true
       });
-      
+
       setSuccessMessage('Product updated successfully');
       setShowEditModal(false);
       fetchProducts();
-      
+
       // Clear success message after 3 seconds
       setTimeout(() => {
         setSuccessMessage('');
@@ -105,11 +119,11 @@ const Products = () => {
       await axios.delete(`http://localhost:5000/api/products/${deleteProductId}`, {
         withCredentials: true
       });
-      
+
       setSuccessMessage('Product deleted successfully');
       setShowDeleteModal(false);
       fetchProducts();
-      
+
       // Clear success message after 3 seconds
       setTimeout(() => {
         setSuccessMessage('');
@@ -121,7 +135,7 @@ const Products = () => {
   };
 
   // Filter products based on search term
-  const filteredProducts = products.filter(product => 
+  const filteredProducts = products.filter(product =>
     product.pname.toLowerCase().includes(searchTerm.toLowerCase()) ||
     product.pcode.toLowerCase().includes(searchTerm.toLowerCase())
   );
@@ -134,6 +148,7 @@ const Products = () => {
           onClick={() => {
             setFormError('');
             setNewProduct({ pname: '', quantity: 0 });
+            setValidationErrors({...validationErrors, newProductName: ''});
             setShowAddModal(true);
           }}
           className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 flex items-center"
@@ -142,21 +157,21 @@ const Products = () => {
           Add Product
         </button>
       </div>
-      
+
       {/* Success message */}
       {successMessage && (
         <div className="bg-green-100 p-3 rounded-md text-green-800">
           {successMessage}
         </div>
       )}
-      
+
       {/* Error message */}
       {error && (
         <div className="bg-red-100 p-3 rounded-md text-red-800">
           {error}
         </div>
       )}
-      
+
       {/* Search bar */}
       <div className="relative">
         <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
@@ -178,7 +193,7 @@ const Products = () => {
           </button>
         )}
       </div>
-      
+
       {/* Products table */}
       <div className="bg-white shadow rounded-lg overflow-hidden">
         {loading ? (
@@ -230,6 +245,7 @@ const Products = () => {
                             id: product.id,
                             pname: product.pname
                           });
+                          setValidationErrors({...validationErrors, editProductName: ''});
                           setShowEditModal(true);
                         }}
                         className="text-blue-600 hover:text-blue-900 mr-4"
@@ -257,19 +273,19 @@ const Products = () => {
           </div>
         )}
       </div>
-      
+
       {/* Add Product Modal */}
       {showAddModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg p-6 w-full max-w-md">
             <h2 className="text-xl font-bold mb-4">Add New Product</h2>
-            
+
             {formError && (
               <div className="mb-4 p-2 bg-red-100 text-red-800 rounded-md text-sm">
                 {formError}
               </div>
             )}
-            
+
             <form onSubmit={handleAddProduct}>
               <div className="mb-4">
                 <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -278,12 +294,16 @@ const Products = () => {
                 <input
                   type="text"
                   value={newProduct.pname}
-                  onChange={(e) => setNewProduct({ ...newProduct, pname: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                  onChange={(e) => {
+                    setNewProduct({ ...newProduct, pname: e.target.value });
+                    setValidationErrors({...validationErrors, newProductName: ''});
+                  }}
+                  className={`w-full px-3 py-2 border ${validationErrors.newProductName ? 'border-red-500' : 'border-gray-300'} rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500`}
                   required
                 />
+                <FormValidationError message={validationErrors.newProductName} />
               </div>
-              
+
               <div className="mb-4">
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Initial Quantity (Optional)
@@ -296,7 +316,7 @@ const Products = () => {
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
                 />
               </div>
-              
+
               <div className="flex justify-end space-x-3">
                 <button
                   type="button"
@@ -316,19 +336,19 @@ const Products = () => {
           </div>
         </div>
       )}
-      
+
       {/* Edit Product Modal */}
       {showEditModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg p-6 w-full max-w-md">
             <h2 className="text-xl font-bold mb-4">Edit Product</h2>
-            
+
             {formError && (
               <div className="mb-4 p-2 bg-red-100 text-red-800 rounded-md text-sm">
                 {formError}
               </div>
             )}
-            
+
             <form onSubmit={handleEditProduct}>
               <div className="mb-4">
                 <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -337,12 +357,16 @@ const Products = () => {
                 <input
                   type="text"
                   value={editProduct.pname}
-                  onChange={(e) => setEditProduct({ ...editProduct, pname: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                  onChange={(e) => {
+                    setEditProduct({ ...editProduct, pname: e.target.value });
+                    setValidationErrors({...validationErrors, editProductName: ''});
+                  }}
+                  className={`w-full px-3 py-2 border ${validationErrors.editProductName ? 'border-red-500' : 'border-gray-300'} rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500`}
                   required
                 />
+                <FormValidationError message={validationErrors.editProductName} />
               </div>
-              
+
               <div className="flex justify-end space-x-3">
                 <button
                   type="button"
@@ -362,7 +386,7 @@ const Products = () => {
           </div>
         </div>
       )}
-      
+
       {/* Delete Confirmation Modal */}
       {showDeleteModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
@@ -371,7 +395,7 @@ const Products = () => {
             <p className="mb-4 text-gray-600">
               Are you sure you want to delete this product? This action cannot be undone.
             </p>
-            
+
             <div className="flex justify-end space-x-3">
               <button
                 onClick={() => setShowDeleteModal(false)}
